@@ -32,15 +32,15 @@ O projeto consiste em uma mini Estação de tratamento de água(ETA), escolhemos
 ### Montagem:
 Fotos :
 
-![Imagem copiada](./img/mkd.png)
+![Como funciona uma ETA](./img/eta_how_it_works.jpg)
 
-![Imagem copiada](./img/mkd.png)
+![Imagem do recipiente](./img/eta_tanque.jpg)
 
-![Imagem copiada](./img/mkd.png)
+![Outra](./img/eta_tanque2.jpg)
 
-![Imagem copiada](./img/mkd.png)
+![Circuito na placa visto de cima](./img/eta_frontal.jpg)
 
-![Imagem copiada](./img/mkd.png)
+![Visto de trás](./img/eta_back.jpg)
 
 ### Código-fonte:
 [Clique aqui](https://github.com/jonas4040) .
