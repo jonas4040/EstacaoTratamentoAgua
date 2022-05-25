@@ -1,4 +1,4 @@
-# Mini Estação de Tratamento Água
+Mini Estação de Tratamento Água
 ------------------
 ### Descrição do projeto: 
 O projeto consiste em uma mini Estação de tratamento de água(ETA), escolhemos esta temática para entender melhor o funcionamento de uma ETA real.
@@ -43,7 +43,7 @@ Fotos :
 ![Visto de trás](./img/eta_back.jpg)
 
 ### Código-fonte:
-[Clique aqui](https://github.com/jonas4040) .
+[Clique aqui](https://github.com/jonas4040/EstacaoTratamentoAgua/src/EstacaoTratamentoAgua/EstacaoTratamentoAgua.ino) .
 
 ### Resultados: 
 A parte que deu mais trabalho foi a montagem do circuito na placa de fenolite e a montagem e junção dos recipientes de acrílico. Obtivemos um resultado satisfatório na medição da turbidez e do pH da água.
