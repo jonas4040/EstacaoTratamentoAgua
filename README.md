@@ -43,7 +43,7 @@ Fotos :
 ![Visto de trás](./img/eta_back.jpg)
 
 ### Código-fonte:
-[Clique aqui](https://github.com/jonas4040/EstacaoTratamentoAgua/src/EstacaoTratamentoAgua/EstacaoTratamentoAgua.ino) .
+([Clique aqui](https://github.com/jonas4040/EstacaoTratamentoAgua/blob/main/src/EstacaoTratamentoAgua/EstacaoTratamentoAgua.ino)) .
 
 ### Resultados: 
 A parte que deu mais trabalho foi a montagem do circuito na placa de fenolite e a montagem e junção dos recipientes de acrílico. Obtivemos um resultado satisfatório na medição da turbidez e do pH da água.
