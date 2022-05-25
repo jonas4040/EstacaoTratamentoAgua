@@ -1,2 +1,2 @@
-#Explicação do Código Fonte
+Explicação do Código Fonte
 ---------------------------------
