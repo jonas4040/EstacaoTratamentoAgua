@@ -44,9 +44,8 @@ void setup() {
   lcd.init();
   lcd.backlight();
   //Serial.println("Ligando a bomba (10 segundos). . .");
-  lcd.print(" ON 10 segundos. . .");
+  lcd.print(" ON (10 segundos). . .");
   delay(10000);
-  lcd.clear();
   digitalWrite(rele1,HIGH);
 }
 
@@ -54,15 +53,11 @@ void loop() {
   //Serial.println("FUNCIONANDO.");
   //testeDeDisplay();
   //Serial.print("Tbd 1: ");
-  lcd.setCursor(0,0);
-  lcd.print("1-");
   leSensorTbd(turb1);
   //Serial.print("Tbd 2: ");
-  lcd.print("2-");
   leSensorTbd(turb2);
   //Serial.print("PH: ");
   //Serial.println(calcPH());
-  lcd.setCursor(0,1);
   lcd.print("PH: ");
   lcd.print(calcPH());
   delay(300);
@@ -101,7 +96,7 @@ void leSensorTbd(int pinoTurb){
   //Serial.print(NTU);
   //Serial.println(" NTU");
   
- // lcd.clear();
+  lcd.clear();
  // aux1 = map(sensorValue , 0 , 4095, 1000, 0);
  
  // lcd.setCursor(0,0);
