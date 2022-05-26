@@ -1,6 +1,6 @@
 /*
 	*******
-	Version 1.2
+	Version 1.2.2
 	*******
 */
 
@@ -56,10 +56,11 @@ void loop() {
   //Serial.print("Tbd 1: ");
   lcd.setCursor(0,0);
   lcd.print("1-");
-  leSensorTbd(turb1);
+  lcd.print(leSensorTbd(turb1));
+  lcd.print(" ");
   //Serial.print("Tbd 2: ");
   lcd.print("2-");
-  leSensorTbd(turb2);
+  lcd.print(leSensorTbd(turb2));
   //Serial.print("PH: ");
   //Serial.println(calcPH());
   lcd.setCursor(0,1);
@@ -85,7 +86,7 @@ float calcNTU(float voltagem){
     return valorNTU;
 }
 
-void leSensorTbd(int pinoTurb){
+float leSensorTbd(int pinoTurb){
   //lcd.clear();
   //lcd.setCursor(0,0);
   //lcd.print("ESP 32 ! ! !");
@@ -106,20 +107,19 @@ void leSensorTbd(int pinoTurb){
  
  // lcd.setCursor(0,0);
  // lcd.print("Tbd: ");
-  lcd.print(NTU);
-  lcd.print(" ");
+     //aqui esava o lcd prin 
   delay(200);
-
+  return NTU;
 }
 
 void nivelBoia(int boil){
   //Lógica da boia
   int nivelBoil=digitalRead(boil);
-  if(nivelBoil==HIGH){
+  if(nivelBoil==HIGH || leSensorTbd(turb1) >=80){
     //Se precisar usar a boia
     //Serial.println("Já encheu, desligando a bomba (10 segundos) . . .");
     digitalWrite(rele1,LOW);  
-  }else if(nivelBoil == 0){
+  }else if(nivelBoil == 0 || leSensorTbd(turb1) < 80){
     //Serial.println("Já estamos ligando a bomba novamente (10 segundos). . .");
     delay(10000);
     digitalWrite(rele1,HIGH);  
