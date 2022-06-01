@@ -1,7 +1,7 @@
 /*
-	*******
-	Version 1.2.2
-	*******
+  *******
+  Version 1.2.3
+  *******
 */
 
 #include <Wire.h>
@@ -10,8 +10,8 @@
 #define turb1 34
 #define turb2 35
 #define ph 33
-#define rele1 26
-#define rele2 25
+#define rele1 25
+#define rele2 26
 #define boia 27
 int aturb1 = 0;
 int aturb2 = 0;
@@ -39,13 +39,13 @@ void setup() {
 //  pinMode(phTemp, INPUT);
   pinMode(rele1, OUTPUT);
   pinMode(rele2, OUTPUT);
-  pinMode(boia,OUTPUT);
+  pinMode(boia,INPUT);
   
   lcd.init();
   lcd.backlight();
   //Serial.println("Ligando a bomba (10 segundos). . .");
-  lcd.print(" ON 10 segundos. . .");
-  delay(10000);
+  lcd.print(" wait a second");
+  delay(2000);
   lcd.clear();
   digitalWrite(rele1,HIGH);
 }
@@ -115,13 +115,13 @@ float leSensorTbd(int pinoTurb){
 void nivelBoia(int boil){
   //Lógica da boia
   int nivelBoil=digitalRead(boil);
-  if(nivelBoil==HIGH || leSensorTbd(turb1) >=80){
+  if(nivelBoil==HIGH || leSensorTbd(turb1) >=130){
     //Se precisar usar a boia
     //Serial.println("Já encheu, desligando a bomba (10 segundos) . . .");
     digitalWrite(rele1,LOW);  
-  }else if(nivelBoil == 0 || leSensorTbd(turb1) < 80){
+  }else if(nivelBoil == LOW || leSensorTbd(turb1) < 130){
     //Serial.println("Já estamos ligando a bomba novamente (10 segundos). . .");
-    delay(10000);
+    delay(2000);
     digitalWrite(rele1,HIGH);  
   }
 }
