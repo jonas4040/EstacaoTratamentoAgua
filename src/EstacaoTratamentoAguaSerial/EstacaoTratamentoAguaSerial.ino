@@ -4,8 +4,8 @@
 #define turb1 34
 #define turb2 35
 #define ph 33
-#define rele1 26
-#define rele2 25
+#define rele1 25
+#define rele2 26
 #define boia 27
 int aturb1 = 0;
 int aturb2 = 0;
@@ -33,12 +33,12 @@ void setup() {
 //  pinMode(phTemp, INPUT);
   pinMode(rele1, OUTPUT);
   pinMode(rele2, OUTPUT);
-  pinMode(boia,OUTPUT);
+  pinMode(boia,INPUT);
   
   lcd.init();
   lcd.backlight();
-  Serial.println("Ligando a bomba (10 segundos). . .");
-  delay(10000);
+  Serial.println("Ligando a bomba (Em alguns segundos). . .");
+  delay(2000);
   digitalWrite(rele1,HIGH);
 }
 
@@ -71,7 +71,7 @@ float calcNTU(float voltagem){
     return valorNTU;
 }
 
-void leSensorTbd(int pinoTurb){
+float leSensorTbd(int pinoTurb){
   //lcd.clear();
   //lcd.setCursor(0,0);
   //lcd.print("ESP 32 ! ! !");
@@ -94,19 +94,21 @@ void leSensorTbd(int pinoTurb){
   //lcd.print("Tbd: ");
   //lcd.print(aux1);
   delay(200);
-
+  return NTU;
 }
 
 void nivelBoia(int boil){
   //Lógica da boia
   int nivelBoil=digitalRead(boil);
-  if(nivelBoil==HIGH){
+  //Serial.println(nivelBoil);
+  if(nivelBoil==HIGH || leSensorTbd(turb1) >=130){
     //Se precisar usar a boia
-    Serial.println("Já encheu, desligando a bomba (10 segundos) . . .");
+    Serial.println("Já encheu, desligando a bomba (alguns segundos) . . .");
+    Serial.print("Boia: ");
     digitalWrite(rele1,LOW);  
-  }else if(nivelBoil == 0){
-    Serial.println("Já estamos ligando a bomba novamente (10 segundos). . .");
-    delay(10000);
+  }else if(nivelBoil == LOW || leSensorTbd(turb1)<130){
+    Serial.println("Já estamos ligando a bomba novamente (alguns segundos). . .");
+    delay(2000);
     digitalWrite(rele1,HIGH);  
   }
 }
