@@ -42,6 +42,20 @@ Fotos :
 
 ![Visto de trás](./img/eta_back.jpg)
 
+![](./img/garrafas.jpg)
+
+![](./img/recip-1.jpg)
+
+![](./img/recip-2.jpg)
+
+![](./img/recip-3.jpg)
+
+![](./img/recip-4.jpg)
+
+![](./img/recip-5.jpg)
+
+![](./img/recip-6.jpg)
+
 ### Código-fonte:
 ([Clique aqui](https://github.com/jonas4040/EstacaoTratamentoAgua/blob/main/src/EstacaoTratamentoAgua/EstacaoTratamentoAgua.ino)) .
 
