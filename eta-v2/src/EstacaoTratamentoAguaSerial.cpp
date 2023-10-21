@@ -10,14 +10,16 @@
 */
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 
 //-------VARIAVEIS E CONSTANTES COMUNS---------
+#define DEBUG_MODE_ON 1
 #define turb1 34
 #define turb2 35
 #define ph 33
 #define BOMBA 26
 #define MISTURADOR 25
-#define boia 27
+#define BOIA 27
 int aturb1 = 0;
 int aturb2 = 0;
 int aph = 0;
@@ -39,11 +41,14 @@ TaskHandle_t tbdHandle = NULL;
 TaskHandle_t boiaHandle = NULL;
 TaskHandle_t bombaDaguaHandle = NULL;
 TaskHandle_t misturadorHandle = NULL;
+UBaseType_t memoriaLivre;
+QueueHandle_t filaBoiaHandle;
+QueueHandle_t filaTurbidezHandle;
 
 float calcPH();
 float calcNTU(float);
 float leSensorTbd(int);
-void nivelBoia(int);
+void nivelBoiaISR();
 void ligaMisturador(uint8_t,float);
 
 /*
@@ -51,27 +56,31 @@ void ligaMisturador(uint8_t,float);
 */
 void vBombaDaguaTask(void *pvParams);
 void vMisturadorTask(void *pvParams);
+void vBoiaTask(void *pvParams);
+void exibeMemoriaDisponivel(TaskHandle_t);
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
 
-  xTaskCreate(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE,NULL,1,&bombaDaguaHandle);
-  xTaskCreate(vMisturadorTask,"MISTURADOR",configMINIMAL_STACK_SIZE+1024,(void *)18,2,&misturadorHandle);
+  /* Tarefas de comunicacao = PROtocol*/
+  filaBoiaHandle= xQueueCreate(5,sizeof(int));
+  xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE,NULL,1,&bombaDaguaHandle,PRO_CPU_NUM);
+
+  /* Tarefas comuns = APPlication*/
+  xTaskCreatePinnedToCore(vMisturadorTask,"MISTURADOR",configMINIMAL_STACK_SIZE+1024,(void *)18,2,&misturadorHandle,APP_CPU_NUM);
 
 
   pinMode(turb1, INPUT);
   pinMode(turb2, INPUT);
   pinMode(ph, INPUT);
+  pinMode(BOIA,INPUT);
+
 //  pinMode(phTemp, INPUT);
-  pinMode(BOMBA, OUTPUT);
-  pinMode(boia,INPUT);
-  
+  attachInterrupt(digitalPinToInterrupt(BOIA),nivelBoiaISR,FALLING);
   //lcd.init();
   //lcd.backlight();
-  Serial.println("Ligando a bomba (Em alguns segundos). . .");
-  delay(2000);
-  digitalWrite(BOMBA,HIGH);
+  
 }
 
 void loop() {
@@ -92,8 +101,30 @@ void loop() {
     TASKS
 */
 void vBombaDaguaTask(void *pvParams){
+  pinMode(BOMBA, OUTPUT);
+  Serial.println("Ligando a bomba (Em alguns segundos). . .");
+  digitalWrite(BOMBA,HIGH);  
+  bool nivelBoil;
   while (1){
-    vTaskDelay(1000);
+    xQueueReceive(filaBoiaHandle,&nivelBoil,portMAX_DELAY);
+    
+    if(nivelBoil
+    //  || leSensorTbd(turb1) >=130
+     ){
+      //Se precisar usar a boia
+      Serial.println("Já encheu, desligando a bomba (alguns segundos) . . .");
+      digitalWrite(BOMBA,LOW);  
+    }else if(!nivelBoil
+    //  || leSensorTbd(turb1)<130
+    ){
+      Serial.println("Já estamos ligando a bomba novamente (alguns segundos). . .");
+      vTaskDelay(pdMS_TO_TICKS(2000));
+      digitalWrite(BOMBA,HIGH);  
+    }
+    Serial.print("Boia: ");
+    Serial.println(nivelBoil?"Vai transbordar":"Enchendo");
+    exibeMemoriaDisponivel(NULL);
+
   }
   
 }
@@ -108,8 +139,22 @@ void vMisturadorTask(void *pvParams){
       vTaskDelay(pdMS_TO_TICKS(1000*segundos));
       digitalWrite(MISTURADOR,LOW);
       vTaskDelay(pdMS_TO_TICKS(1000*segundos));
+      exibeMemoriaDisponivel(NULL);
     }
     
+}
+
+/* PARA DEBUG */
+void exibeMemoriaDisponivel(TaskHandle_t handleTask){
+  if(DEBUG_MODE_ON){
+    memoriaLivre = uxTaskGetStackHighWaterMark(handleTask);
+    Serial.print("Memoria Livre ");
+    Serial.print(pcTaskGetName(handleTask));
+    Serial.print(" : ");
+    Serial.print(memoriaLivre);
+    Serial.println("B");
+  }
+  
 }
 
 float calcPH(){
@@ -153,22 +198,10 @@ float leSensorTbd(int pinoTurb){
   return NTU;
 }
 
-void nivelBoia(int boil){
+void nivelBoiaISR(){
   //Lógica da boia
-  int nivelBoil=digitalRead(boil);
-  //Serial.println(nivelBoil);
-  if(nivelBoil==HIGH || leSensorTbd(turb1) >=130){
-    //Se precisar usar a boia
-    Serial.println("Já encheu, desligando a bomba (alguns segundos) . . .");
-    digitalWrite(BOMBA,LOW);  
-  }else if(nivelBoil == LOW || leSensorTbd(turb1)<130){
-    Serial.println("Já estamos ligando a bomba novamente (alguns segundos). . .");
-    delay(2000);
-    digitalWrite(BOMBA,HIGH);  
-  }
-
-  Serial.print("Boia: ");
-  Serial.println(nivelBoil);
+  bool nivelBoil = true;
+  xQueueSendFromISR(filaBoiaHandle,&nivelBoil,NULL);
 }
 
 void ligaMisturador(uint8_t pino, float minutos){
