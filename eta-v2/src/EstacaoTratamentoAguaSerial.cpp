@@ -14,8 +14,8 @@
 
 //-------VARIAVEIS E CONSTANTES COMUNS---------
 #define DEBUG_MODE_ON 1
-#define turb1 34
-#define turb2 35
+#define TURB1 34
+#define TURB2 35
 #define ph 33
 #define BOMBA 26
 #define MISTURADOR 25
@@ -37,7 +37,8 @@ float sensorValue = 0.0;
 /*
   Variaveis tasks FreeRTOS
 */
-TaskHandle_t tbdHandle = NULL;
+TaskHandle_t tbd1Handle = NULL;
+TaskHandle_t tbd2Handle = NULL;
 TaskHandle_t boiaHandle = NULL;
 TaskHandle_t bombaDaguaHandle = NULL;
 TaskHandle_t misturadorHandle = NULL;
@@ -57,6 +58,7 @@ void ligaMisturador(uint8_t,float);
 void vBombaDaguaTask(void *pvParams);
 void vMisturadorTask(void *pvParams);
 void vBoiaTask(void *pvParams);
+void vTurbidezTask(void *pvParams);
 void exibeMemoriaDisponivel(TaskHandle_t);
 
 void setup() {
@@ -65,14 +67,19 @@ void setup() {
 
   /* Tarefas de comunicacao = PROtocol*/
   filaBoiaHandle= xQueueCreate(5,sizeof(int));
-  xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE,NULL,1,&bombaDaguaHandle,PRO_CPU_NUM);
+  filaTurbidezHandle = xQueueCreate(180,sizeof(float));
+
+  xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,1,&bombaDaguaHandle,PRO_CPU_NUM);
+  // xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_1",configMINIMAL_STACK_SIZE+2048,(void *)TURB1,3,&tbd1Handle,PRO_CPU_NUM);
+  // xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_2",configMINIMAL_STACK_SIZE+2048,(void *)TURB2,3,&tbd2Handle,PRO_CPU_NUM);
+
 
   /* Tarefas comuns = APPlication*/
   xTaskCreatePinnedToCore(vMisturadorTask,"MISTURADOR",configMINIMAL_STACK_SIZE+1024,(void *)18,2,&misturadorHandle,APP_CPU_NUM);
 
 
-  pinMode(turb1, INPUT);
-  pinMode(turb2, INPUT);
+  pinMode(TURB1, INPUT);
+  pinMode(TURB2, INPUT);
   pinMode(ph, INPUT);
   pinMode(BOIA,INPUT);
 
@@ -86,9 +93,9 @@ void setup() {
 void loop() {
   //testeDeDisplay();
   // Serial.print("Tbd 1: ");
-  // leSensorTbd(turb1);
+  // leSensorTbd(TURB1);
   // Serial.print("Tbd 2: ");
-  // leSensorTbd(turb2);
+  // leSensorTbd(TURB2);
   // Serial.print("PH: ");
   // Serial.println(calcPH());
   // delay(300);
@@ -109,13 +116,13 @@ void vBombaDaguaTask(void *pvParams){
     xQueueReceive(filaBoiaHandle,&nivelBoil,portMAX_DELAY);
     
     if(nivelBoil
-    //  || leSensorTbd(turb1) >=130
+    //  || leSensorTbd(TURB1) >=130
      ){
       //Se precisar usar a boia
       Serial.println("Já encheu, desligando a bomba (alguns segundos) . . .");
       digitalWrite(BOMBA,LOW);  
     }else if(!nivelBoil
-    //  || leSensorTbd(turb1)<130
+    //  || leSensorTbd(TURB1)<130
     ){
       Serial.println("Já estamos ligando a bomba novamente (alguns segundos). . .");
       vTaskDelay(pdMS_TO_TICKS(2000));
@@ -144,6 +151,26 @@ void vMisturadorTask(void *pvParams){
     
 }
 
+void vTurbidezTask(void *pvParams){
+  uint8_t pinoTurb = (int) pvParams;
+  sensorValue = analogRead(pinoTurb);
+  sensorValue+=1494; 
+  voltage = sensorValue * (3.2 / 4095);  //anes esava 3.2v
+
+  NTU = calcNTU(sensorValue);
+
+  //Serial.println(voltage);
+  Serial.print("Turbidez ");
+  Serial.print(pinoTurb == TURB1 ? "1 " : "2 ");
+  Serial.print("-> ");
+  Serial.print(NTU);
+  Serial.println(" NTU");
+  
+  vTaskDelay(pdMS_TO_TICKS(200));
+  xQueueSend(filaTurbidezHandle,&NTU,portMAX_DELAY);
+  exibeMemoriaDisponivel(NULL);
+}
+
 /* PARA DEBUG */
 void exibeMemoriaDisponivel(TaskHandle_t handleTask){
   if(DEBUG_MODE_ON){
@@ -157,45 +184,13 @@ void exibeMemoriaDisponivel(TaskHandle_t handleTask){
   
 }
 
-float calcPH(){
-  float milivolt;
-  milivolt= analogRead(ph);
-  ackph=map(milivolt,0,4095,0.00,14.00);
-  
-  return ackph;
-}
+
 
 float calcNTU(float voltagem){
     float valorNTU;
     valorNTU= map(voltagem, 0, 4095, 1000, 0);
     // -(1120.4*voltagem*voltagem)+(5742.3*voltagem)-4352.9;
     return valorNTU;
-}
-
-float leSensorTbd(int pinoTurb){
-  ////lcd.clear();
-  ////lcd.setCursor(0,0);
-  ////lcd.print("ESP 32 ! ! !");
-  //escrevaDisplay("ESP 32 ! ! !");
-  sensorValue = analogRead(pinoTurb);
-  sensorValue+=1494; 
-  voltage = sensorValue * (3.2 / 4095);  //anes esava 3.2v
-
-  NTU = calcNTU(sensorValue);
-
-  //O serial interfere no //lcd print
-  //Serial.println(voltage);  
-  Serial.print(NTU);
-  Serial.println(" NTU");
-  
-  ////lcd.clear();
- // aux1 = map(sensorValue , 0 , 4095, 1000, 0);
- 
- // //lcd.setCursor(0,0);
-  ////lcd.print("Tbd: ");
-  ////lcd.print(aux1);
-  delay(200);
-  return NTU;
 }
 
 void nivelBoiaISR(){
@@ -210,28 +205,14 @@ void ligaMisturador(uint8_t pino, float minutos){
     digitalWrite(pino,LOW);
     vTaskDelay(pdMS_TO_TICKS(1000*60*minutos));
 }
-// void escrevaDisplay(char msg[19]){
-//   //lcd.clear();
-//   //lcd.setCursor(0,0);
-//   //lcd.print(msg);
-// }
 
-// void testeDeDisplay(){
-//    for(int i=0;i<=7;i++){
-//     //lcd.clear();
-    
-//     //lcd.setCursor(2,0);
-//     //lcd.print("pH: ");
-    
-//     //lcd.print(i);
-
-//     //lcd.setCursor(1,1);
-//     //lcd.print("Tbd: ");
-//     //lcd.print(i*10);
-//     //lcd.print(" NTU");
-//     delay(120);  
-//   }
-// }
+float calcPH(){
+  float milivolt;
+  milivolt= analogRead(ph);
+  ackph=map(milivolt,0,4095,0.00,14.00);
+  
+  return ackph;
+}
 
 /**
  * TESTES
