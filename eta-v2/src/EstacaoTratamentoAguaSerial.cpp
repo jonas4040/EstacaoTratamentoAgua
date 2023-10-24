@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-
+#include "Teleplot.h"
 /**
  * Bibliotecas FreeRTOS
 */
@@ -70,8 +70,8 @@ void setup() {
   filaTurbidezHandle = xQueueCreate(180,sizeof(float));
 
   xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,1,&bombaDaguaHandle,PRO_CPU_NUM);
-  // xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_1",configMINIMAL_STACK_SIZE+2048,(void *)TURB1,3,&tbd1Handle,PRO_CPU_NUM);
-  // xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_2",configMINIMAL_STACK_SIZE+2048,(void *)TURB2,3,&tbd2Handle,PRO_CPU_NUM);
+  xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_1",configMINIMAL_STACK_SIZE+2048,(void *)TURB1,3,&tbd1Handle,PRO_CPU_NUM);
+  xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_2",configMINIMAL_STACK_SIZE+2048,(void *)TURB2,3,&tbd2Handle,PRO_CPU_NUM);
 
 
   /* Tarefas comuns = APPlication*/
@@ -113,6 +113,7 @@ void vBombaDaguaTask(void *pvParams){
   digitalWrite(BOMBA,HIGH);  
   bool nivelBoil;
   while (1){
+    nivelBoil = false;
     xQueueReceive(filaBoiaHandle,&nivelBoil,portMAX_DELAY);
     
     if(nivelBoil
@@ -153,22 +154,24 @@ void vMisturadorTask(void *pvParams){
 
 void vTurbidezTask(void *pvParams){
   uint8_t pinoTurb = (int) pvParams;
-  sensorValue = analogRead(pinoTurb);
-  sensorValue+=1494; 
-  voltage = sensorValue * (3.2 / 4095);  //anes esava 3.2v
+  while(1){
+    sensorValue = analogRead(pinoTurb);
+    sensorValue+=1494; 
+    voltage = sensorValue * (3.2 / 4095);  //anes esava 3.2v
 
-  NTU = calcNTU(sensorValue);
+    NTU = calcNTU(sensorValue);
 
-  //Serial.println(voltage);
-  Serial.print("Turbidez ");
-  Serial.print(pinoTurb == TURB1 ? "1 " : "2 ");
-  Serial.print("-> ");
-  Serial.print(NTU);
-  Serial.println(" NTU");
-  
-  vTaskDelay(pdMS_TO_TICKS(200));
-  xQueueSend(filaTurbidezHandle,&NTU,portMAX_DELAY);
-  exibeMemoriaDisponivel(NULL);
+    //Serial.println(voltage);
+    Serial.print("Turbidez ");
+    Serial.print(pinoTurb == TURB1 ? "1 " : "2 ");
+    Serial.print("-> ");
+    Serial.print(NTU);
+    Serial.println(" NTU");
+
+    vTaskDelay(pdMS_TO_TICKS(200));
+    xQueueSend(filaTurbidezHandle,&NTU,portMAX_DELAY);
+    exibeMemoriaDisponivel(NULL);
+  }
 }
 
 /* PARA DEBUG */
