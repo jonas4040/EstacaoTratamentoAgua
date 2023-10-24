@@ -112,10 +112,17 @@ void vBombaDaguaTask(void *pvParams){
   Serial.println("Ligando a bomba (Em alguns segundos). . .");
   digitalWrite(BOMBA,HIGH);  
   bool nivelBoil;
+  float NTU;
   while (1){
     nivelBoil = false;
+    
+    /* queue da boia*/
     xQueueReceive(filaBoiaHandle,&nivelBoil,portMAX_DELAY);
     
+    /* queue dos sensores de turbidez*/
+    xQueueReceive(filaTurbidezHandle,&NTU,portMAX_DELAY);
+    xQueueReceive(filaTurbidezHandle,&NTU,portMAX_DELAY);
+
     if(nivelBoil
     //  || leSensorTbd(TURB1) >=130
      ){
