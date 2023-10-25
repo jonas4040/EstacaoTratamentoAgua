@@ -4,13 +4,14 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include "Teleplot.h"
+
 /**
  * Bibliotecas FreeRTOS
 */
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 
 //-------VARIAVEIS E CONSTANTES COMUNS---------
 #define DEBUG_MODE_ON 1
@@ -45,6 +46,7 @@ TaskHandle_t misturadorHandle = NULL;
 UBaseType_t memoriaLivre;
 QueueHandle_t filaBoiaHandle;
 QueueHandle_t filaTurbidezHandle;
+SemaphoreHandle_t serialSemaphore;
 
 float calcPH();
 float calcNTU(float);
@@ -60,12 +62,16 @@ void vMisturadorTask(void *pvParams);
 void vBoiaTask(void *pvParams);
 void vTurbidezTask(void *pvParams);
 void exibeMemoriaDisponivel(TaskHandle_t);
+void escreverSerial(const char *);
+void escreverSerial(float);
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
 
   /* Tarefas de comunicacao = PROtocol*/
+  serialSemaphore = xSemaphoreCreateMutex();
+ 	xSemaphoreGive(serialSemaphore);
   filaBoiaHandle= xQueueCreate(5,sizeof(int));
   filaTurbidezHandle = xQueueCreate(180,sizeof(float));
 
@@ -84,23 +90,11 @@ void setup() {
   pinMode(BOIA,INPUT);
 
 //  pinMode(phTemp, INPUT);
-  attachInterrupt(digitalPinToInterrupt(BOIA),nivelBoiaISR,FALLING);
-  //lcd.init();
-  //lcd.backlight();
+  attachInterrupt(digitalPinToInterrupt(BOIA),nivelBoiaISR,RISING);
   
 }
 
 void loop() {
-  //testeDeDisplay();
-  // Serial.print("Tbd 1: ");
-  // leSensorTbd(TURB1);
-  // Serial.print("Tbd 2: ");
-  // leSensorTbd(TURB2);
-  // Serial.print("PH: ");
-  // Serial.println(calcPH());
-  // delay(300);
-
-  // nivelBoia(boia);
   vTaskDelay(1000);
 }
 
@@ -109,7 +103,7 @@ void loop() {
 */
 void vBombaDaguaTask(void *pvParams){
   pinMode(BOMBA, OUTPUT);
-  Serial.println("Ligando a bomba (Em alguns segundos). . .");
+  escreverSerial("Ligando a bomba (Em alguns segundos). . .\n");
   digitalWrite(BOMBA,HIGH);  
   bool nivelBoil;
   float NTU;
@@ -127,17 +121,17 @@ void vBombaDaguaTask(void *pvParams){
     //  || leSensorTbd(TURB1) >=130
      ){
       //Se precisar usar a boia
-      Serial.println("Já encheu, desligando a bomba (alguns segundos) . . .");
+      escreverSerial("Já encheu, desligando a bomba (alguns segundos) . . .\n");
       digitalWrite(BOMBA,LOW);  
     }else if(!nivelBoil
     //  || leSensorTbd(TURB1)<130
     ){
-      Serial.println("Já estamos ligando a bomba novamente (alguns segundos). . .");
+      escreverSerial("Já estamos ligando a bomba novamente (alguns segundos). . .\n");
       vTaskDelay(pdMS_TO_TICKS(2000));
       digitalWrite(BOMBA,HIGH);  
     }
-    Serial.print("Boia: ");
-    Serial.println(nivelBoil?"Vai transbordar":"Enchendo");
+    escreverSerial("Boia: ");
+    escreverSerial(nivelBoil?"Vai transbordar\n":"Enchendo\n");
     exibeMemoriaDisponivel(NULL);
 
   }
@@ -147,7 +141,6 @@ void vBombaDaguaTask(void *pvParams){
 void vMisturadorTask(void *pvParams){
     int segundos = (int)pvParams;
     pinMode(MISTURADOR, OUTPUT);
-    Serial.println("MISTURADOR");
     
     while (1){
       digitalWrite(MISTURADOR,HIGH);
@@ -168,12 +161,12 @@ void vTurbidezTask(void *pvParams){
 
     NTU = calcNTU(sensorValue);
 
-    //Serial.println(voltage);
-    Serial.print("Turbidez ");
-    Serial.print(pinoTurb == TURB1 ? "1 " : "2 ");
-    Serial.print("-> ");
-    Serial.print(NTU);
-    Serial.println(" NTU");
+    //escreverSerial(voltage);
+    escreverSerial("Turbidez ");
+    escreverSerial(pinoTurb == TURB1 ? "1 " : "2 ");
+    escreverSerial("-> ");
+    escreverSerial(NTU);
+    escreverSerial(" NTU\n");
 
     vTaskDelay(pdMS_TO_TICKS(200));
     xQueueSend(filaTurbidezHandle,&NTU,portMAX_DELAY);
@@ -181,15 +174,30 @@ void vTurbidezTask(void *pvParams){
   }
 }
 
+void escreverSerial(float number) {
+	if (xSemaphoreTake(serialSemaphore, portMAX_DELAY) == pdTRUE) {
+		Serial.print(number);
+		Serial.print(" ");
+		xSemaphoreGive(serialSemaphore);
+	}
+}
+
+void escreverSerial(const char *str) {
+	if (xSemaphoreTake(serialSemaphore, portMAX_DELAY) == pdTRUE) {
+		Serial.print(str);
+		xSemaphoreGive(serialSemaphore);
+	}
+}
+
 /* PARA DEBUG */
 void exibeMemoriaDisponivel(TaskHandle_t handleTask){
   if(DEBUG_MODE_ON){
     memoriaLivre = uxTaskGetStackHighWaterMark(handleTask);
-    Serial.print("Memoria Livre ");
-    Serial.print(pcTaskGetName(handleTask));
-    Serial.print(" : ");
-    Serial.print(memoriaLivre);
-    Serial.println("B");
+    escreverSerial("Memoria Livre ");
+    escreverSerial(pcTaskGetName(handleTask));
+    escreverSerial(" : ");
+    escreverSerial(memoriaLivre);
+    escreverSerial("B \n");
   }
   
 }
