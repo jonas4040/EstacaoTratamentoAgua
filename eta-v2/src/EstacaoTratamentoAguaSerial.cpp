@@ -14,7 +14,7 @@
 #include "freertos/semphr.h"
 
 //-------VARIAVEIS E CONSTANTES COMUNS---------
-#define DEBUG_MODE_ON 1
+#define DEBUG_MODE_ON 0
 #define TURB1 34
 #define TURB2 35
 #define ph 33
@@ -72,7 +72,7 @@ void setup() {
   /* Tarefas de comunicacao = PROtocol*/
   serialSemaphore = xSemaphoreCreateMutex();
  	xSemaphoreGive(serialSemaphore);
-  filaBoiaHandle= xQueueCreate(5,sizeof(int));
+  filaBoiaHandle= xQueueCreate(5,sizeof(bool));
   filaTurbidezHandle = xQueueCreate(180,sizeof(float));
 
   xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,1,&bombaDaguaHandle,PRO_CPU_NUM);
@@ -108,7 +108,7 @@ void vBombaDaguaTask(void *pvParams){
   bool nivelBoil;
   float NTU;
   while (1){
-    nivelBoil = false;
+    //nivelBoil = false;
     
     /* queue da boia*/
     xQueueReceive(filaBoiaHandle,&nivelBoil,portMAX_DELAY);
@@ -213,8 +213,12 @@ float calcNTU(float voltagem){
 
 void nivelBoiaISR(){
   //Lógica da boia
-  bool nivelBoil = true;
-  xQueueSendFromISR(filaBoiaHandle,&nivelBoil,NULL);
+  bool nivelBoil;
+  if(xQueueSendFromISR(filaBoiaHandle,&nivelBoil,NULL) == pdTRUE){
+      nivelBoil = true;
+  }else{
+    nivelBoil = false;
+  }
 }
 
 void ligaMisturador(uint8_t pino, float minutos){
