@@ -90,7 +90,7 @@ void setup() {
   pinMode(BOIA,INPUT);
 
 //  pinMode(phTemp, INPUT);
-  attachInterrupt(digitalPinToInterrupt(BOIA),nivelBoiaISR,RISING);
+  attachInterrupt(digitalPinToInterrupt(BOIA),nivelBoiaISR,CHANGE);
   
 }
 
@@ -213,11 +213,15 @@ float calcNTU(float voltagem){
 
 void nivelBoiaISR(){
   //Lógica da boia
-  bool nivelBoil;
-  if(xQueueSendFromISR(filaBoiaHandle,&nivelBoil,NULL) == pdTRUE){
-      nivelBoil = true;
-  }else{
-    nivelBoil = false;
+  bool nivelBoil = digitalRead(BOIA);
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+
+  xQueueSendFromISR(filaBoiaHandle,&nivelBoil,&xHigherPriorityTaskWoken);
+
+
+  if (xHigherPriorityTaskWoken == pdTRUE) {
+    portYIELD_FROM_ISR();
   }
 }
 
