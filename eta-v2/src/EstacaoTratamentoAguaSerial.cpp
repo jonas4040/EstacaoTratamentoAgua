@@ -92,6 +92,10 @@ void setup() {
 //  pinMode(phTemp, INPUT);
   attachInterrupt(digitalPinToInterrupt(BOIA),nivelBoiaISR,CHANGE);
   
+  pinMode(BOMBA, OUTPUT);
+  escreverSerial("Ligando a bomba (Em alguns segundos). . .\n");
+  digitalWrite(BOMBA,HIGH); 
+  
 }
 
 void loop() {
@@ -102,9 +106,6 @@ void loop() {
     TASKS
 */
 void vBombaDaguaTask(void *pvParams){
-  pinMode(BOMBA, OUTPUT);
-  escreverSerial("Ligando a bomba (Em alguns segundos). . .\n");
-  digitalWrite(BOMBA,HIGH);  
   bool nivelBoil;
   float NTU;
   while (1){
