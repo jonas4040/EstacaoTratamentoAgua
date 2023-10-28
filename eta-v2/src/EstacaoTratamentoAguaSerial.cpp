@@ -27,8 +27,6 @@ int aph = 0;
 int atemp = 0;
 float aux1 = 0.0;
 float auxTurb1 = 0.0;
-float  NTU = 0.0;
-float voltage;
 float ackturb2 = 0.0;
 float ackph = 0.0;
 float acktemp = 0.0;
@@ -44,6 +42,7 @@ TaskHandle_t boiaHandle = NULL;
 TaskHandle_t bombaDaguaHandle = NULL;
 TaskHandle_t misturadorHandle = NULL;
 UBaseType_t memoriaLivre;
+UBaseType_t espacosQueue;
 QueueHandle_t filaBoiaHandle;
 QueueHandle_t filaTurbidezHandle;
 SemaphoreHandle_t serialSemaphore;
@@ -62,6 +61,7 @@ void vMisturadorTask(void *pvParams);
 void vBoiaTask(void *pvParams);
 void vTurbidezTask(void *pvParams);
 void exibeMemoriaDisponivel(TaskHandle_t);
+void exibeEspacosQueue(QueueHandle_t);
 void escreverSerial(const char *);
 void escreverSerial(float);
 
@@ -72,10 +72,10 @@ void setup() {
   /* Tarefas de comunicacao = PROtocol*/
   serialSemaphore = xSemaphoreCreateMutex();
  	xSemaphoreGive(serialSemaphore);
-  filaBoiaHandle= xQueueCreate(5,sizeof(bool));
-  filaTurbidezHandle = xQueueCreate(512,sizeof(float));
+  filaBoiaHandle= xQueueCreate(1,sizeof(bool));
+  filaTurbidezHandle = xQueueCreate(1,sizeof(float));
 
-  xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,3,&bombaDaguaHandle,PRO_CPU_NUM);
+  xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,1,&bombaDaguaHandle,PRO_CPU_NUM);
   xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_1",configMINIMAL_STACK_SIZE+2048,(void *)TURB1,1,&tbd1Handle,PRO_CPU_NUM);
   // xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_2",configMINIMAL_STACK_SIZE+2048,(void *)TURB2,3,&tbd2Handle,PRO_CPU_NUM);
 
@@ -112,10 +112,16 @@ void vBombaDaguaTask(void *pvParams){
     //nivelBoil = false;
     
     /* queue da boia*/
-    xQueueReceive(filaBoiaHandle,&nivelBoil,portMAX_DELAY);
+    xQueueReceive(filaBoiaHandle,(void *)&nivelBoil,portMAX_DELAY);
     
     /* queue dos sensores de turbidez*/
-    xQueueReceive(filaTurbidezHandle,&valorTbd,portMAX_DELAY);
+    // if(xQueueReceive(filaTurbidezHandle,&valorTbd,portMAX_DELAY) != pdTRUE){
+    //   xQueueReset(filaBoiaHandle);
+    // }
+    xQueueReceive(filaTurbidezHandle,(void *)&valorTbd,portMAX_DELAY);
+    exibeEspacosQueue(filaTurbidezHandle);
+
+    
     escreverSerial(valorTbd);
     escreverSerial(" <--- \n");
 
@@ -152,18 +158,21 @@ void vMisturadorTask(void *pvParams){
 
 void vTurbidezTask(void *pvParams){
   uint8_t pinoTurb = (int) pvParams;
+  float NTU = 0.0;
+  float voltage = 0.0;
+
   while(1){
     sensorValue = analogRead(pinoTurb);
     sensorValue+=1494; 
     voltage = sensorValue * (3.2 / 4095);  //anes esava 3.2v
 
     NTU = calcNTU(sensorValue);
-
-    if(xQueueSend(filaTurbidezHandle,&NTU,portMAX_DELAY) == pdTRUE){
-      escreverSerial("Enviou -->");
-    }else{
-      break;
-    }
+    xQueueOverwrite(filaTurbidezHandle,(void *)&NTU);
+    // if(xQueueSend(filaTurbidezHandle,&NTU,portMAX_DELAY) == pdTRUE){
+    //   escreverSerial("Enviou -->");
+    // }else{
+    //   break;
+    // }
     vTaskDelay(pdMS_TO_TICKS(200));
 
 
@@ -197,13 +206,22 @@ void escreverSerial(const char *str) {
 void exibeMemoriaDisponivel(TaskHandle_t handleTask){
   if(DEBUG_MODE_ON){
     memoriaLivre = uxTaskGetStackHighWaterMark(handleTask);
-    escreverSerial("Memoria Livre ");
+    escreverSerial("Memoria Livre Task");
     escreverSerial(pcTaskGetName(handleTask));
     escreverSerial(" : ");
     escreverSerial(memoriaLivre);
     escreverSerial("B \n");
   }
   
+}
+
+void exibeEspacosQueue(QueueHandle_t xQueue){
+  if(DEBUG_MODE_ON){
+    espacosQueue = uxQueueSpacesAvailable(xQueue);
+    escreverSerial("Espaços Disponiveis nas Filas (turbidez): ");
+    escreverSerial(espacosQueue);
+    escreverSerial(" \n");
+  }
 }
 
 
@@ -221,7 +239,7 @@ void nivelBoiaISR(){
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
 
-  xQueueSendFromISR(filaBoiaHandle,&nivelBoil,&xHigherPriorityTaskWoken);
+  xQueueOverwriteFromISR(filaBoiaHandle,(void *)&nivelBoil,&xHigherPriorityTaskWoken);
 
 
   if (xHigherPriorityTaskWoken == pdTRUE) {
