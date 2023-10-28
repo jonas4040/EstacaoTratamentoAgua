@@ -16,7 +16,7 @@
 //-------VARIAVEIS E CONSTANTES COMUNS---------
 #define DEBUG_MODE_ON 0
 #define TURB1 34
-#define TURB2 35
+//#define TURB2 35
 #define ph 33
 #define BOMBA 26
 #define MISTURADOR 25
@@ -73,11 +73,11 @@ void setup() {
   serialSemaphore = xSemaphoreCreateMutex();
  	xSemaphoreGive(serialSemaphore);
   filaBoiaHandle= xQueueCreate(5,sizeof(bool));
-  filaTurbidezHandle = xQueueCreate(180,sizeof(float));
+  filaTurbidezHandle = xQueueCreate(512,sizeof(float));
 
-  xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,1,&bombaDaguaHandle,PRO_CPU_NUM);
-  xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_1",configMINIMAL_STACK_SIZE+2048,(void *)TURB1,3,&tbd1Handle,PRO_CPU_NUM);
-  xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_2",configMINIMAL_STACK_SIZE+2048,(void *)TURB2,3,&tbd2Handle,PRO_CPU_NUM);
+  xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,3,&bombaDaguaHandle,PRO_CPU_NUM);
+  xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_1",configMINIMAL_STACK_SIZE+2048,(void *)TURB1,1,&tbd1Handle,PRO_CPU_NUM);
+  // xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_2",configMINIMAL_STACK_SIZE+2048,(void *)TURB2,3,&tbd2Handle,PRO_CPU_NUM);
 
 
   /* Tarefas comuns = APPlication*/
@@ -85,8 +85,8 @@ void setup() {
 
 
   pinMode(TURB1, INPUT);
-  pinMode(TURB2, INPUT);
-  pinMode(ph, INPUT);
+  // pinMode(TURB2, INPUT);
+  // pinMode(ph, INPUT);
   pinMode(BOIA,INPUT);
 
 //  pinMode(phTemp, INPUT);
@@ -107,7 +107,7 @@ void loop() {
 */
 void vBombaDaguaTask(void *pvParams){
   bool nivelBoil;
-  float NTU;
+  float valorTbd;
   while (1){
     //nivelBoil = false;
     
@@ -115,18 +115,15 @@ void vBombaDaguaTask(void *pvParams){
     xQueueReceive(filaBoiaHandle,&nivelBoil,portMAX_DELAY);
     
     /* queue dos sensores de turbidez*/
-    xQueueReceive(filaTurbidezHandle,&NTU,portMAX_DELAY);
-    xQueueReceive(filaTurbidezHandle,&NTU,portMAX_DELAY);
+    xQueueReceive(filaTurbidezHandle,&valorTbd,portMAX_DELAY);
+    escreverSerial(valorTbd);
+    escreverSerial(" <--- \n");
 
-    if(nivelBoil
-    //  || leSensorTbd(TURB1) >=130
-     ){
+    if(nivelBoil  || valorTbd >= 130){
       //Se precisar usar a boia
       escreverSerial("Já encheu, desligando a bomba (alguns segundos) . . .\n");
       digitalWrite(BOMBA,LOW);  
-    }else if(!nivelBoil
-    //  || leSensorTbd(TURB1)<130
-    ){
+    }else if(!nivelBoil || valorTbd < 130){
       escreverSerial("Já estamos ligando a bomba novamente (alguns segundos). . .\n");
       vTaskDelay(pdMS_TO_TICKS(2000));
       digitalWrite(BOMBA,HIGH);  
@@ -162,15 +159,21 @@ void vTurbidezTask(void *pvParams){
 
     NTU = calcNTU(sensorValue);
 
+    if(xQueueSend(filaTurbidezHandle,&NTU,portMAX_DELAY) == pdTRUE){
+      escreverSerial("Enviou -->");
+    }else{
+      break;
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+
     //escreverSerial(voltage);
     escreverSerial("Turbidez ");
     escreverSerial(pinoTurb == TURB1 ? "1 " : "2 ");
     escreverSerial("-> ");
     escreverSerial(NTU);
     escreverSerial(" NTU\n");
-
-    vTaskDelay(pdMS_TO_TICKS(200));
-    xQueueSend(filaTurbidezHandle,&NTU,portMAX_DELAY);
+    
     exibeMemoriaDisponivel(NULL);
   }
 }
