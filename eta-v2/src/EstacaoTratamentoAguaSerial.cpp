@@ -21,15 +21,9 @@
 #define BOMBA 26
 #define MISTURADOR 25
 #define BOIA 27
-int aturb1 = 0;
-int aturb2 = 0;
+
 int aph = 0;
-int atemp = 0;
-float aux1 = 0.0;
-float auxTurb1 = 0.0;
-float ackturb2 = 0.0;
 float ackph = 0.0;
-float acktemp = 0.0;
 float sensorValue = 0.0;
 //LiquidCrystal_I2C //lcd(0x27,20,4);//VCC no Vin SDA 21 SCL 22
 
@@ -47,12 +41,17 @@ QueueHandle_t filaBoiaHandle;
 QueueHandle_t filaTurbidezHandle;
 SemaphoreHandle_t serialSemaphore;
 
+/*
+  Prototipos de funçoes comuns
+*/
+
 float calcPH();
 float calcNTU(float);
-float leSensorTbd(int);
 void nivelBoiaISR();
-void ligaMisturador(uint8_t,float);
-
+void exibeMemoriaDisponivel(TaskHandle_t);
+void exibeEspacosQueue(QueueHandle_t);
+void escreverSerial(const char *);
+void escreverSerial(float);
 /*
   Prototipos freertos
 */
@@ -60,10 +59,6 @@ void vBombaDaguaTask(void *pvParams);
 void vMisturadorTask(void *pvParams);
 void vBoiaTask(void *pvParams);
 void vTurbidezTask(void *pvParams);
-void exibeMemoriaDisponivel(TaskHandle_t);
-void exibeEspacosQueue(QueueHandle_t);
-void escreverSerial(const char *);
-void escreverSerial(float);
 
 void setup() {
   // put your setup code here, to run once:
@@ -115,9 +110,6 @@ void vBombaDaguaTask(void *pvParams){
     xQueueReceive(filaBoiaHandle,(void *)&nivelBoil,portMAX_DELAY);
     
     /* queue dos sensores de turbidez*/
-    // if(xQueueReceive(filaTurbidezHandle,&valorTbd,portMAX_DELAY) != pdTRUE){
-    //   xQueueReset(filaBoiaHandle);
-    // }
     xQueueReceive(filaTurbidezHandle,(void *)&valorTbd,portMAX_DELAY);
     exibeEspacosQueue(filaTurbidezHandle);
 
@@ -187,44 +179,9 @@ void vTurbidezTask(void *pvParams){
   }
 }
 
-void escreverSerial(float number) {
-	if (xSemaphoreTake(serialSemaphore, portMAX_DELAY) == pdTRUE) {
-		Serial.print(number);
-		Serial.print(" ");
-		xSemaphoreGive(serialSemaphore);
-	}
-}
-
-void escreverSerial(const char *str) {
-	if (xSemaphoreTake(serialSemaphore, portMAX_DELAY) == pdTRUE) {
-		Serial.print(str);
-		xSemaphoreGive(serialSemaphore);
-	}
-}
-
-/* PARA DEBUG */
-void exibeMemoriaDisponivel(TaskHandle_t handleTask){
-  if(DEBUG_MODE_ON){
-    memoriaLivre = uxTaskGetStackHighWaterMark(handleTask);
-    escreverSerial("Memoria Livre Task");
-    escreverSerial(pcTaskGetName(handleTask));
-    escreverSerial(" : ");
-    escreverSerial(memoriaLivre);
-    escreverSerial("B \n");
-  }
-  
-}
-
-void exibeEspacosQueue(QueueHandle_t xQueue){
-  if(DEBUG_MODE_ON){
-    espacosQueue = uxQueueSpacesAvailable(xQueue);
-    escreverSerial("Espaços Disponiveis nas Filas (turbidez): ");
-    escreverSerial(espacosQueue);
-    escreverSerial(" \n");
-  }
-}
-
-
+/*
+    Funç~oes comuns
+*/
 
 float calcNTU(float voltagem){
     float valorNTU;
@@ -247,13 +204,6 @@ void nivelBoiaISR(){
   }
 }
 
-void ligaMisturador(uint8_t pino, float minutos){
-    digitalWrite(pino,HIGH);
-    vTaskDelay(pdMS_TO_TICKS(1000*60*minutos));
-    digitalWrite(pino,LOW);
-    vTaskDelay(pdMS_TO_TICKS(1000*60*minutos));
-}
-
 float calcPH(){
   float milivolt;
   milivolt= analogRead(ph);
@@ -262,72 +212,41 @@ float calcPH(){
   return ackph;
 }
 
-/**
- * TESTES
-*/
+void escreverSerial(float number) {
+	if (xSemaphoreTake(serialSemaphore, portMAX_DELAY) == pdTRUE) {
+		Serial.print(number);
+		Serial.print(" ");
+		xSemaphoreGive(serialSemaphore);
+	}
+}
+
+void escreverSerial(const char *str) {
+	if (xSemaphoreTake(serialSemaphore, portMAX_DELAY) == pdTRUE) {
+		Serial.print(str);
+		xSemaphoreGive(serialSemaphore);
+	}
+}
 
 /*
-#include <Arduino.h>
-#include <Wire.h>
-
-#define RELE_1 25
-#define RELE_2 26
-#define BOIA 27
-#define TBD_1 34
-#define TBD_2 35
-
-void testeReleLiga(uint8_t pino);
-void testeLeBoia();
-void testeTurbidez(uint8_t pino);
-float calcNTU(float voltagem);
-
-void setup(){
-    Serial.begin(115200);
-    pinMode(RELE_1, OUTPUT);
-    pinMode(RELE_2, OUTPUT);
-    pinMode(BOIA,INPUT);
-}
-
-void loop(){
-    // testeReleLiga(RELE_1);
-    // testeReleLiga(RELE_2);
-    //testeLeBoia();
-    testeTurbidez(TBD_1);
-}
-
-void testeReleLiga(uint8_t pino){
-    uint8_t estado = 0;
-    digitalWrite(pino,HIGH);
-    estado = !estado;
-    delay(3000);
-    digitalWrite(pino,LOW);
-    delay(3000);
-}
-
-void testeLeBoia()
-{
-  //D27 sensorNivel
-  Serial.print("Sensor de n'ivel: ");
-  Serial.println(digitalRead(BOIA));
-}
-
-void testeTurbidez(uint8_t pino){
-  uint16_t sensorValue = analogRead(pino);
-  sensorValue+=1494; 
-  uint16_t voltage = sensorValue * (3.2 / 4095);  //anes esava 3.2v
-
-  uint16_t NTU = calcNTU(sensorValue);
-
-  //O serial interfere no //lcd print
-  //Serial.println(voltage);  
-  Serial.print(NTU);
-  Serial.println(" NTU");
-}
-
-float calcNTU(float voltagem){
-    float valorNTU;
-    valorNTU= map(voltagem, 0, 4095, 1000, 0);
-    // -(1120.4*voltagem*voltagem)+(5742.3*voltagem)-4352.9;
-    return valorNTU;
-}
+  PARA DEBUG
 */
+void exibeMemoriaDisponivel(TaskHandle_t handleTask){
+  if(DEBUG_MODE_ON){
+    memoriaLivre = uxTaskGetStackHighWaterMark(handleTask);
+    escreverSerial("Memoria Livre Task");
+    escreverSerial(pcTaskGetName(handleTask));
+    escreverSerial(" : ");
+    escreverSerial(memoriaLivre);
+    escreverSerial("B \n");
+  }
+  
+}
+
+void exibeEspacosQueue(QueueHandle_t xQueue){
+  if(DEBUG_MODE_ON){
+    espacosQueue = uxQueueSpacesAvailable(xQueue);
+    escreverSerial("Espaços Disponiveis nas Filas (turbidez): ");
+    escreverSerial(espacosQueue);
+    escreverSerial(" \n");
+  }
+}
