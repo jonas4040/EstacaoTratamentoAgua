@@ -31,6 +31,7 @@ float ackturb2 = 0.0;
 float ackph = 0.0;
 float acktemp = 0.0;
 float sensorValue = 0.0;
+//LiquidCrystal_I2C //lcd(0x27,20,4);//VCC no Vin SDA 21 SCL 22
 
 /*
   Variaveis tasks FreeRTOS
@@ -45,11 +46,13 @@ UBaseType_t espacosQueue;
 QueueHandle_t filaBoiaHandle;
 QueueHandle_t filaTurbidezHandle;
 SemaphoreHandle_t serialSemaphore;
-SemaphoreHandle_t boilSemaphore = NULL;
 
 float calcPH();
 float calcNTU(float);
-void IRAM_ATTR nivelBoiaISR();
+float leSensorTbd(int);
+void nivelBoiaISR();
+void ligaMisturador(uint8_t,float);
+
 /*
   Prototipos freertos
 */
@@ -69,13 +72,10 @@ void setup() {
   /* Tarefas de comunicacao = PROtocol*/
   serialSemaphore = xSemaphoreCreateMutex();
  	xSemaphoreGive(serialSemaphore);
-  //boilSemaphore = xSemaphoreCreateBinary();
-
-
   filaBoiaHandle= xQueueCreate(1,sizeof(bool));
   filaTurbidezHandle = xQueueCreate(1,sizeof(float));
 
-  xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,3,&bombaDaguaHandle,PRO_CPU_NUM);
+  xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,1,&bombaDaguaHandle,PRO_CPU_NUM);
   xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_1",configMINIMAL_STACK_SIZE+2048,(void *)TURB1,1,&tbd1Handle,PRO_CPU_NUM);
   // xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_2",configMINIMAL_STACK_SIZE+2048,(void *)TURB2,3,&tbd2Handle,PRO_CPU_NUM);
 
@@ -114,28 +114,31 @@ void vBombaDaguaTask(void *pvParams){
     /* queue da boia*/
     xQueueReceive(filaBoiaHandle,(void *)&nivelBoil,portMAX_DELAY);
     
+    /* queue dos sensores de turbidez*/
+    // if(xQueueReceive(filaTurbidezHandle,&valorTbd,portMAX_DELAY) != pdTRUE){
+    //   xQueueReset(filaBoiaHandle);
+    // }
     xQueueReceive(filaTurbidezHandle,(void *)&valorTbd,portMAX_DELAY);
     exibeEspacosQueue(filaTurbidezHandle);
 
     
     escreverSerial(valorTbd);
     escreverSerial(" <--- \n");
-  // if (xSemaphoreTake(boilSemaphore, portMAX_DELAY) == pdTRUE){
-      if(nivelBoil  || valorTbd >= 130){
-        //Se precisar usar a boia
-        escreverSerial("Já encheu, desligando a bomba (alguns segundos) . . .\n");
-        digitalWrite(BOMBA,LOW);  
-      }else if(!nivelBoil || valorTbd < 130){
-        escreverSerial("Já estamos ligando a bomba novamente (alguns segundos). . .\n");
-        //vTaskDelay(pdMS_TO_TICKS(2000));
-        digitalWrite(BOMBA,HIGH);  
-      }
-      escreverSerial("Boia: ");
-      escreverSerial(nivelBoil?"Vai transbordar\n":"Enchendo\n");
-      exibeMemoriaDisponivel(NULL);
 
-    // }
-}
+    if(nivelBoil  || valorTbd >= 130){
+      //Se precisar usar a boia
+      escreverSerial("Já encheu, desligando a bomba (alguns segundos) . . .\n");
+      digitalWrite(BOMBA,LOW);  
+    }else if(!nivelBoil || valorTbd < 130){
+      escreverSerial("Já estamos ligando a bomba novamente (alguns segundos). . .\n");
+      vTaskDelay(pdMS_TO_TICKS(2000));
+      digitalWrite(BOMBA,HIGH);  
+    }
+    escreverSerial("Boia: ");
+    escreverSerial(nivelBoil?"Vai transbordar\n":"Enchendo\n");
+    exibeMemoriaDisponivel(NULL);
+
+  }
   
 }
 
@@ -165,7 +168,12 @@ void vTurbidezTask(void *pvParams){
 
     NTU = calcNTU(sensorValue);
     xQueueOverwrite(filaTurbidezHandle,(void *)&NTU);
-    //vTaskDelay(pdMS_TO_TICKS(200));
+    // if(xQueueSend(filaTurbidezHandle,&NTU,portMAX_DELAY) == pdTRUE){
+    //   escreverSerial("Enviou -->");
+    // }else{
+    //   break;
+    // }
+    vTaskDelay(pdMS_TO_TICKS(200));
 
 
     //escreverSerial(voltage);
@@ -225,18 +233,25 @@ float calcNTU(float voltagem){
     return valorNTU;
 }
 
-void IRAM_ATTR nivelBoiaISR(){
+void nivelBoiaISR(){
   //Lógica da boia
   bool nivelBoil = digitalRead(BOIA);
-  vTaskDelay(pdMS_TO_TICKS(20));
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
 
   xQueueOverwriteFromISR(filaBoiaHandle,(void *)&nivelBoil,&xHigherPriorityTaskWoken);
 
+
   if (xHigherPriorityTaskWoken == pdTRUE) {
-      portYIELD_FROM_ISR();
+    portYIELD_FROM_ISR();
   }
+}
+
+void ligaMisturador(uint8_t pino, float minutos){
+    digitalWrite(pino,HIGH);
+    vTaskDelay(pdMS_TO_TICKS(1000*60*minutos));
+    digitalWrite(pino,LOW);
+    vTaskDelay(pdMS_TO_TICKS(1000*60*minutos));
 }
 
 float calcPH(){
