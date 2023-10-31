@@ -37,7 +37,6 @@ TaskHandle_t bombaDaguaHandle = NULL;
 TaskHandle_t misturadorHandle = NULL;
 UBaseType_t memoriaLivre;
 UBaseType_t espacosQueue;
-QueueHandle_t filaBoiaHandle;
 QueueHandle_t filaTurbidezHandle;
 SemaphoreHandle_t serialSemaphore;
 
@@ -47,7 +46,6 @@ SemaphoreHandle_t serialSemaphore;
 
 float calcPH();
 float calcNTU(float);
-void nivelBoiaISR();
 void exibeMemoriaDisponivel(TaskHandle_t);
 void exibeEspacosQueue(QueueHandle_t);
 void escreverSerial(const char *);
@@ -66,8 +64,8 @@ void setup() {
 
   /* Tarefas de comunicacao = PROtocol*/
   serialSemaphore = xSemaphoreCreateMutex();
- 	xSemaphoreGive(serialSemaphore);
-  filaBoiaHandle= xQueueCreate(1,sizeof(bool));
+  xSemaphoreGive(serialSemaphore);
+
   filaTurbidezHandle = xQueueCreate(1,sizeof(float));
 
   xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,1,&bombaDaguaHandle,PRO_CPU_NUM);
@@ -85,7 +83,6 @@ void setup() {
   pinMode(BOIA,INPUT);
 
 //  pinMode(phTemp, INPUT);
-  attachInterrupt(digitalPinToInterrupt(BOIA),nivelBoiaISR,CHANGE);
   
   pinMode(BOMBA, OUTPUT);
   escreverSerial("Ligando a bomba (Em alguns segundos). . .\n");
@@ -104,18 +101,14 @@ void vBombaDaguaTask(void *pvParams){
   bool nivelBoil;
   float valorTbd;
   while (1){
-    //nivelBoil = false;
-    
-    /* queue da boia*/
-    xQueueReceive(filaBoiaHandle,(void *)&nivelBoil,portMAX_DELAY);
-    
+    nivelBoil = digitalRead(BOIA);
+	vTaskDelay(pdMS_TO_TICKS(10));
+    escreverSerial("Boia: ");
+    escreverSerial(nivelBoil?"VERDADEIRO\n":"FALSO\n");
+	
     /* queue dos sensores de turbidez*/
     xQueueReceive(filaTurbidezHandle,(void *)&valorTbd,portMAX_DELAY);
     exibeEspacosQueue(filaTurbidezHandle);
-
-    
-    escreverSerial(valorTbd);
-    escreverSerial(" <--- \n");
 
     if(nivelBoil  || valorTbd >= 130){
       //Se precisar usar a boia
@@ -126,8 +119,7 @@ void vBombaDaguaTask(void *pvParams){
       vTaskDelay(pdMS_TO_TICKS(2000));
       digitalWrite(BOMBA,HIGH);  
     }
-    escreverSerial("Boia: ");
-    escreverSerial(nivelBoil?"Vai transbordar\n":"Enchendo\n");
+    
     exibeMemoriaDisponivel(NULL);
 
   }
@@ -188,20 +180,6 @@ float calcNTU(float voltagem){
     valorNTU= map(voltagem, 0, 4095, 1000, 0);
     // -(1120.4*voltagem*voltagem)+(5742.3*voltagem)-4352.9;
     return valorNTU;
-}
-
-void nivelBoiaISR(){
-  //Lógica da boia
-  bool nivelBoil = digitalRead(BOIA);
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-
-  xQueueOverwriteFromISR(filaBoiaHandle,(void *)&nivelBoil,&xHigherPriorityTaskWoken);
-
-
-  if (xHigherPriorityTaskWoken == pdTRUE) {
-    portYIELD_FROM_ISR();
-  }
 }
 
 float calcPH(){
