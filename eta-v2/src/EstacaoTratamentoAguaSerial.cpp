@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "freertos/timers.h"
 
 //-------VARIAVEIS E CONSTANTES COMUNS---------
 #define DEBUG_MODE_ON 0
@@ -21,6 +22,10 @@
 #define BOMBA 26
 #define MISTURADOR 25
 #define BOIA 27
+
+#define TIME_BOIL 0.033333333
+//#define TIME_BOIL 10
+
 
 int aph = 0;
 float ackph = 0.0;
@@ -35,11 +40,14 @@ TaskHandle_t tbd2Handle = NULL;
 TaskHandle_t boiaHandle = NULL;
 TaskHandle_t bombaDaguaHandle = NULL;
 TaskHandle_t misturadorHandle = NULL;
-UBaseType_t memoriaLivre;
-UBaseType_t espacosQueue;
+
 QueueHandle_t filaTurbidezHandle;
 SemaphoreHandle_t serialSemaphore;
 
+TimerHandle_t timerBoilHandle;
+
+UBaseType_t memoriaLivre;
+UBaseType_t espacosQueue;
 /*
   Prototipos de funçoes comuns
 */
@@ -57,6 +65,7 @@ void vBombaDaguaTask(void *pvParams);
 void vMisturadorTask(void *pvParams);
 void vBoiaTask(void *pvParams);
 void vTurbidezTask(void *pvParams);
+void timerBoil(TimerHandle_t);
 
 void setup() {
   // put your setup code here, to run once:
@@ -67,6 +76,8 @@ void setup() {
   xSemaphoreGive(serialSemaphore);
 
   filaTurbidezHandle = xQueueCreate(1,sizeof(float));
+
+  timerBoilHandle = xTimerCreate("TIMER_BOIA",pdMS_TO_TICKS(TIME_BOIL*60*1000),pdFALSE,0,timerBoil);
 
   xTaskCreatePinnedToCore(vBombaDaguaTask,"BOMBA_DAGUA",configMINIMAL_STACK_SIZE+2048,NULL,1,&bombaDaguaHandle,PRO_CPU_NUM);
   xTaskCreatePinnedToCore(vTurbidezTask,"TURBIDEZ_1",configMINIMAL_STACK_SIZE+2048,(void *)TURB1,1,&tbd1Handle,PRO_CPU_NUM);
@@ -103,9 +114,10 @@ void vBombaDaguaTask(void *pvParams){
   while (1){
     nivelBoil = digitalRead(BOIA);
 	vTaskDelay(pdMS_TO_TICKS(10));
-    escreverSerial("Boia: ");
-    escreverSerial(nivelBoil?"VERDADEIRO\n":"FALSO\n");
-	
+    if(DEBUG_MODE_ON){
+      escreverSerial("Boia: ");
+      escreverSerial(nivelBoil?"VERDADEIRO\n":"FALSO\n");
+    }
     /* queue dos sensores de turbidez*/
     xQueueReceive(filaTurbidezHandle,(void *)&valorTbd,portMAX_DELAY);
     exibeEspacosQueue(filaTurbidezHandle);
@@ -115,9 +127,11 @@ void vBombaDaguaTask(void *pvParams){
       escreverSerial("Já encheu, desligando a bomba (alguns segundos) . . .\n");
       digitalWrite(BOMBA,LOW);  
     }else if(!nivelBoil || valorTbd < 130){
-      escreverSerial("Já estamos ligando a bomba novamente (alguns segundos). . .\n");
-      vTaskDelay(pdMS_TO_TICKS(2000));
-      digitalWrite(BOMBA,HIGH);  
+      escreverSerial("Já estamos ligando a bomba novamente (isso pode demorar um pouco). . .\n");
+      if(DEBUG_MODE_ON)
+        escreverSerial("Iniciando timer da boia . . .\n");
+      if(xTimerIsTimerActive(timerBoilHandle)==pdFALSE)
+        xTimerStart(timerBoilHandle,0);
     }
     
     exibeMemoriaDisponivel(NULL);
@@ -169,6 +183,11 @@ void vTurbidezTask(void *pvParams){
     
     exibeMemoriaDisponivel(NULL);
   }
+}
+
+void timerBoil(TimerHandle_t timerHandle){
+  /* Callback do timer para manter a boia desligada uns minutos antes de desligar*/
+  digitalWrite(BOMBA,HIGH);  
 }
 
 /*

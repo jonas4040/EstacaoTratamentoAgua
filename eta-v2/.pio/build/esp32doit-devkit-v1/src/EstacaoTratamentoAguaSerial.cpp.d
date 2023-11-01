@@ -135,4 +135,5 @@
  /home/jonas/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.h \
  /home/jonas/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal.h \
  .pio/libdeps/esp32doit-devkit-v1/Arduino-LiquidCrystal-I2C-library/LiquidCrystal_I2C.h \
- /home/jonas/.platformio/packages/framework-arduinoespressif32/cores/esp32/Print.h
+ /home/jonas/.platformio/packages/framework-arduinoespressif32/cores/esp32/Print.h \
+ /home/jonas/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/timers.h
