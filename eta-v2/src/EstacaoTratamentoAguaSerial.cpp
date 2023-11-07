@@ -23,8 +23,8 @@
 #define MISTURADOR 25
 #define BOIA 27
 
-#define TIME_BOIL 0.033333333
-//#define TIME_BOIL 10
+#define TIME_BOIL 0.033333333 * 5.0 /* (!) 2s X 5 = 10s */
+// #define TIME_BOIL 10              /* (!) 10min X 60s = 600s = 600000ms */
 
 
 int aph = 0;
