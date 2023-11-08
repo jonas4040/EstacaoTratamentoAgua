@@ -85,7 +85,7 @@ void setup() {
 
 
   /* Tarefas comuns = APPlication*/
-  xTaskCreatePinnedToCore(vMisturadorTask,"MISTURADOR",configMINIMAL_STACK_SIZE+1024,(void *)18,2,&misturadorHandle,APP_CPU_NUM);
+  xTaskCreatePinnedToCore(vMisturadorTask,"MISTURADOR",configMINIMAL_STACK_SIZE+1024,(void *)60,2,&misturadorHandle,APP_CPU_NUM);
 
 
   pinMode(TURB1, INPUT);
@@ -146,7 +146,7 @@ void vMisturadorTask(void *pvParams){
     
     while (1){
       digitalWrite(MISTURADOR,HIGH);
-      vTaskDelay(pdMS_TO_TICKS(1000*segundos));
+      vTaskDelay(pdMS_TO_TICKS(100*segundos));
       digitalWrite(MISTURADOR,LOW);
       vTaskDelay(pdMS_TO_TICKS(1000*segundos));
       exibeMemoriaDisponivel(NULL);
